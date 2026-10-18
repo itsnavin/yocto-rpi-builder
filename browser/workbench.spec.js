@@ -17,6 +17,37 @@ test("renders the local starter, switches templates and previews source", async 
   await expect(page.locator("#preview")).toContainText("install -m 0644");
 });
 
+test("Make, Autotools and CMake offer complete local projects and correct Git UI", async ({ page }) => {
+  for (const template of ["make", "autotools", "cmake"]) {
+    await page.locator(`input[name="template"][value="${template}"]`).check();
+    const bb = page.locator("#preview");
+    await expect(bb).toContainText('SRC_URI = "file://project/"');
+    await expect(bb).toContainText(template === "make" ? "oe_runmake 'DESTDIR=${D}' install" : `inherit ${template}`);
+    if (template !== "make") await expect(bb).not.toContainText("do_configure[noexec]");
+    const file = { make: "Makefile", autotools: "Makefile.am", cmake: "CMakeLists.txt" }[template];
+    await page.locator("#file-picker").selectOption({ label: `meta-myboard/recipes-apps/hello-pi/files/project/${file}` });
+    await expect(bb).toContainText("hello-pi");
+    const pending = page.waitForEvent("download");
+    await page.locator("#download-all").click();
+    const bytes = await readFile(await (await pending).path());
+    expect(bytes.includes(Buffer.from(`project/${file}`))).toBe(true);
+    await page.locator("#file-picker").selectOption("0");
+  }
+  await page.locator("#source").selectOption("git");
+  await expect(page.locator("#source-file-field")).toBeHidden();
+  await page.locator("#gitUrl").fill("https://github.com/example/project.git");
+  await page.locator("#revision").fill("a".repeat(40));
+  await page.locator("#licenseMd5").fill("b".repeat(32));
+  await expect(page.locator("#download-all")).toBeEnabled();
+  await expect(page.locator("#preview")).toContainText('S = "${WORKDIR}/git"');
+  await page.locator('input[name="template"][value="c"]').check();
+  await expect(page.locator("#source-file-field")).toBeVisible();
+  await expect(page.locator("#sourceFile")).toHaveValue("main.c");
+  await page.getByRole("tab", { name: "The basics" }).click();
+  await expect(page.locator("#build-lessons")).toContainText("inherit autotools");
+  await expect(page.locator("#build-lessons")).toContainText("inherit cmake");
+  await expect(page.locator("#build-lessons")).toContainText("RDEPENDS:${PN}");
+});
 test("invalid input disables stale downloads and gives a linked field error", async ({ page }) => {
   await page.locator("#name").fill("../escape");
   await expect(page.locator("#name")).toHaveAttribute("aria-invalid", "true");

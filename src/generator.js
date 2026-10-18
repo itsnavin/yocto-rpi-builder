@@ -19,6 +19,8 @@ export const DEFAULTS = Object.freeze({
   licenseFile: "LICENSE", licenseMd5: "",
 });
 
+export const PROJECT_TEMPLATES = Object.freeze(["make", "autotools", "cmake"]);
+
 const scaffoldLicense = `This license covers the generated layer scaffold and bundled MIT examples.
 It does not relicense Git source or authorized proprietary replacements.
 
@@ -65,11 +67,14 @@ export function validate(input) {
   if (!Object.hasOwn(BOARDS, x.board)) errors.board = "Choose a supported 64-bit Raspberry Pi.";
   if (typeof x.name !== "string" || x.name.length > 60 || !namePattern.test(x.name))
     errors.name = "Use lowercase letters, digits and internal hyphens (start with a letter). No spaces or underscores.";
+  else if (x.source === "local" && ["make", "cmake"].includes(x.template) &&
+      ["all", "clean", "install", "help", "test", "package"].includes(x.name))
+    errors.name = "Choose a name other than a reserved build target such as all, clean, install, help, test or package.";
   if (typeof x.version !== "string" || !/^[0-9]+(?:\.[0-9]+){0,3}$/.test(x.version) || x.version.length > 30)
     errors.version = "Use a numeric version such as 1.0 or 2.1.3.";
   if (!safeText(x.summary, 120)) errors.summary = "Enter 1-120 characters; no quotes, backslashes, dollar signs, backticks or line breaks.";
   if (!safeText(x.description, 500)) errors.description = "Enter 1-500 characters; no quotes, backslashes, dollar signs, backticks or line breaks.";
-  if (!["c", "cpp", "data"].includes(x.template)) errors.template = "Choose C, C++ or a data package.";
+  if (!["c", "cpp", "data", ...PROJECT_TEMPLATES].includes(x.template)) errors.template = "Choose a supported source or build-system template.";
   if (!["local", "git"].includes(x.source)) errors.source = "Choose local files or Git.";
   if (typeof x.depends !== "string" || x.depends.length > 300 ||
       !/^(?:(?:virtual\/)?[a-z0-9][a-z0-9+.-]*(?: +(?:virtual\/)?[a-z0-9][a-z0-9+.-]*)*)?$/.test(x.depends.trim()) ||
@@ -91,7 +96,7 @@ export function validate(input) {
       errors.branch = "Enter a Git branch such as main or release/1.0, without spaces or special syntax.";
     if (typeof x.revision !== "string" || !/^[a-fA-F0-9]{40}$/.test(x.revision))
       errors.revision = "Paste the full 40-character commit SHA from that branch; not HEAD, a tag or AUTOREV.";
-    if (!safePath(x.sourceFile)) errors.sourceFile = "Use a relative file path such as src/main.c. No spaces, traversal or shell syntax.";
+    if (!PROJECT_TEMPLATES.includes(x.template) && !safePath(x.sourceFile)) errors.sourceFile = "Use a relative file path such as src/main.c. No spaces, traversal or shell syntax.";
     else if (x.template === "c" && !x.sourceFile.endsWith(".c")) errors.sourceFile = "The single-file C template needs a .c source file.";
     else if (x.template === "cpp" && !/\.(cpp|cc|cxx)$/.test(x.sourceFile)) errors.sourceFile = "The C++ template needs a .cpp, .cc or .cxx file.";
     if (x.license !== "CLOSED") {
@@ -144,7 +149,9 @@ export function generate(input) {
   const root = `meta-myboard/recipes-apps/${x.name}`;
   const local = x.source === "local";
   const data = x.template === "data";
-  const sourceFile = local ? ({ c: "main.c", cpp: "main.cpp", data: "message.txt" })[x.template] : x.sourceFile;
+  const project = PROJECT_TEMPLATES.includes(x.template);
+  const classManaged = ["autotools", "cmake"].includes(x.template);
+  const sourceFile = local ? ({ c: "main.c", cpp: "main.cpp", data: "message.txt", make: "main.c", autotools: "main.c", cmake: "main.c" })[x.template] : x.sourceFile;
   let recipe = `# Scaffold for Yocto ${RELEASE.name}; review and build-test before use.\n`;
   recipe += `SUMMARY = "${x.summary.trim()}"\nDESCRIPTION = "${x.description.trim()}"\nLICENSE = "${x.license}"\n`;
   if (x.license !== "CLOSED") {
@@ -153,10 +160,28 @@ export function generate(input) {
       : `LIC_FILES_CHKSUM = "file://${x.licenseFile};md5=${x.licenseMd5.toLowerCase()}"\n`;
   }
   recipe += local
-    ? `\nSRC_URI = "file://${sourceFile}"\nS = "\${WORKDIR}"\n`
+    ? project ? '\nSRC_URI = "file://project/"\nS = "${WORKDIR}/project"\n' : `\nSRC_URI = "file://${sourceFile}"\nS = "\${WORKDIR}"\n`
     : `\nSRC_URI = "git://${x.gitUrl.slice(8)};protocol=https;branch=${x.branch}"\nSRCREV = "${x.revision.toLowerCase()}"\nS = "\${WORKDIR}/git"\n`;
-  recipe += `B = "\${WORKDIR}/build"\nDEPENDS = "${x.depends.trim().split(/ +/).filter(Boolean).join(" ")}"\n\ndo_configure[noexec] = "1"\n`;
-  if (data) {
+  if (classManaged) recipe += `\ninherit ${x.template}\n`;
+  else recipe += x.template === "make" ? 'B = "${S}"\n' : 'B = "${WORKDIR}/build"\n';
+  recipe += `DEPENDS ${project ? "+=" : "="} "${x.depends.trim().split(/ +/).filter(Boolean).join(" ")}"\n`;
+  if (!classManaged) recipe += '\ndo_configure[noexec] = "1"\n';
+  if (classManaged) {
+    recipe += "\n# The class owns do_configure, do_compile and do_install.\n# Adapt project options, not the class tasks, unless required.\n";
+  } else if (x.template === "make") {
+    recipe += `
+# This Makefile supports in-source builds, standard flags and staged install.
+EXTRA_OEMAKE = "'CC=\${CC}' 'CFLAGS=\${CFLAGS}' 'CPPFLAGS=\${CPPFLAGS}' 'LDFLAGS=\${LDFLAGS}' 'prefix=\${prefix}' 'bindir=\${bindir}'"
+
+do_compile() {
+    oe_runmake
+}
+
+do_install() {
+    oe_runmake 'DESTDIR=\${D}' install
+}
+`;
+  } else if (data) {
     recipe += `\ninherit allarch\n\ndo_compile[noexec] = "1"\n\ndo_install() {
     install -d "\${D}\${datadir}/\${PN}"
     install -m 0644 "\${S}/${sourceFile}" "\${D}\${datadir}/\${PN}/message.txt"
@@ -210,9 +235,51 @@ ${data ? `cat /usr/share/${x.name}/message.txt` : `/usr/bin/${x.name}`}
   if (local) {
     const header = x.license === "MIT" ? "// SPDX-License-Identifier: MIT\n" : "// Proprietary example: replace with authorized source.\n";
     const content = data ? "Hello from a custom Yocto data package!\n"
-      : x.template === "c" ? `${header}#include <stdio.h>\n\nint main(void) {\n    puts("Hello from my Raspberry Pi!");\n    return 0;\n}\n`
+      : x.template !== "cpp" ? `${header}#include <stdio.h>\n\nint main(void) {\n    puts("Hello from my Raspberry Pi!");\n    return 0;\n}\n`
         : `${header}#include <iostream>\n\nint main() {\n    std::cout << "Hello from my Raspberry Pi!\\n";\n    return 0;\n}\n`;
-    files.splice(1, 0, { path: `${root}/files/${sourceFile}`, content });
+    files.splice(1, 0, { path: `${root}/files/${project ? "project/" : ""}${sourceFile}`, content });
+    if (project) {
+      const add = (name, content) => files.push({ path: `${root}/files/project/${name}`, content });
+      if (x.template === "make") add("Makefile", `# SPDX-License-Identifier: MIT
+prefix ?= /usr
+bindir ?= $(prefix)/bin
+TARGET = ${x.name}
+
+.PHONY: all install clean
+all: $(TARGET)
+
+$(TARGET): main.c
+\t$(CC) $(CPPFLAGS) $(CFLAGS) main.c $(LDFLAGS) -o $@
+
+install: $(TARGET)
+\tinstall -d "$(DESTDIR)$(bindir)"
+\tinstall -m 0755 $(TARGET) "$(DESTDIR)$(bindir)/$(TARGET)"
+
+clean:
+\trm -f $(TARGET)
+`);
+      if (x.template === "autotools") {
+        add("configure.ac", `# SPDX-License-Identifier: MIT
+AC_INIT([${x.name}], [${x.version}])
+AM_INIT_AUTOMAKE([foreign])
+AC_CONFIG_SRCDIR([main.c])
+AC_PROG_CC
+AC_CONFIG_FILES([Makefile])
+AC_OUTPUT
+`);
+        add("Makefile.am", `# SPDX-License-Identifier: MIT
+bin_PROGRAMS = ${x.name}
+${x.name.replaceAll("-", "_")}_SOURCES = main.c
+`);
+      }
+      if (x.template === "cmake") add("CMakeLists.txt", `# SPDX-License-Identifier: MIT
+cmake_minimum_required(VERSION 3.16)
+project(${x.name} LANGUAGES C)
+include(GNUInstallDirs)
+add_executable(${x.name} main.c)
+install(TARGETS ${x.name} RUNTIME DESTINATION \${CMAKE_INSTALL_BINDIR})
+`);
+    }
   }
   return { errors: {}, files };
 }

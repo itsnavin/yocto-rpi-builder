@@ -10,6 +10,9 @@ Published through GitHub Pages with desktop/mobile live smoke checks.
 
 - Generates standalone **C**, **C++**, and **data-file** package recipes from local
   examples or a public HTTPS Git repository with a pinned commit.
+- Also generates **Make**, **Autotools**, and **CMake** project recipes with complete
+  local C examples or an existing Git project. The basics tab explains source layout,
+  cross-compilation, task ownership, staging/install paths, and dependencies.
 - Includes SUMMARY, DESCRIPTION, LICENSE, license checksums where required,
   SRC_URI/SRCREV, release-appropriate source/build paths, DEPENDS,
   do_compile/do_install, and IMAGE_INSTALL.
@@ -48,15 +51,20 @@ through `file://`; browser module loading requires HTTP. `npm run build` copies
 only the static site into `dist/`. All asset URLs are relative so the site works
 under a GitHub Pages project subpath.
 
-The Node test suite covers all 12 board/template/source combinations, license
+The Node test suite covers all 24 board/template/source combinations, license
 handling, input/URI/path/metadata injection edge cases, compiler/install flags,
 image/config consistency, branch pins, deterministic tar checksums/round-trips,
 long archive paths, and core accessibility/static asset contracts. The browser
 suite exercises templates, validation, Git licensing, board-specific config,
 downloads, keyboard tabs, quiz behavior, text-only rendering and responsive
-overflow. These are application tests, **not BitBake or physical Raspberry Pi tests**.
+overflow. On Linux, three additional native smoke tests compile, stage-install and
+run the bundled Make/Autotools/CMake C examples using host tools (`cc`, `make`,
+`autoreconf`, `automake`, `cmake`). Missing tools fail explicitly; install your
+distribution's build-essential, autoconf, automake and cmake packages if needed.
+These native tests skip on Windows/macOS. They check source/build file coherence,
+**not BitBake cross-compilation or physical Raspberry Pi execution**.
 
-For a manual browser check: switch both boards; try all three templates and both
+For a manual browser check: switch both boards; try all six templates and both
 source modes; enter invalid names, source paths, URLs and missing Git checksums;
 ensure stale files cannot be copied/downloaded; check preview/copy and extract
 the archive; navigate tabs with arrows/Home/End; read guide code with keyboard
@@ -84,10 +92,9 @@ enable U-Boot. It does not require extra meta-openembedded layers for the minima
 path. Inspect the pinned metadata rather than copying its generic README's
 `master` example.
 
-**Test status:** 78 Node unit tests and 14 desktop/mobile Chromium browser tests
-passed locally on Node 22.23.3 and in GitHub Actions on Linux; the static production
-build and Pages deployment succeeded. Live desktop/mobile smoke checks verified
-asset loading, board-specific config/guide, tar downloads, layout and browser errors.
+**Test coverage:** 91 generator/static tests, three Linux-only native source-build
+smoke checks and 16 desktop/mobile Chromium browser checks. CI runs them before
+publishing. Native source tests do not validate Yocto recipe execution.
 The source/release/machine definitions are documentation-checked only:
 no successful full Yocto build or physical Pi boot is claimed. Application tests
 do not establish board support. A pinned release is reproducible input
@@ -95,8 +102,10 @@ metadata, not a guarantee that all upstream downloads remain available or that
 old snapshots contain current security fixes. Review updates before deployment.
 
 For this release, local `file://` sources unpack into `${WORKDIR}`, and Git into
-`${WORKDIR}/git`. Generated recipes use an explicit separate `${B}` and install
-under `${D}`. Do not carry these unpacking conventions into newer Yocto releases
+`${WORKDIR}/git`. Local build-system projects use `${WORKDIR}/project`. Plain Make
+uses `B = "${S}"` for its in-source Makefile; single-file and class-managed builds
+use a separate build directory. All installation is staged under `${D}`.
+Do not carry these unpacking conventions into newer Yocto releases
 without consulting their migration notes.
 
 ## License and source boundaries
@@ -108,11 +117,49 @@ For Git source, users must supply the actual license path and MD5 from the pinne
 checkout. The site does not fabricate or remotely verify checksums. `CLOSED` is
 only for authorized proprietary source; it is not a license-compliance shortcut.
 
-The C/C++ templates compile **one standalone source file**, not arbitrary build
-systems. Adapt for headers, multiple files, CMake/Make/Meson, libraries, linker
-flags, runtime dependencies, services and complex licensing. DEPENDS alone does
-not link libraries. The data template installs one file as
+The C/C++ templates compile **one standalone source file**. Select a project
+template for Make, Autotools or CMake; Meson is outside this tool's scope. Adapt for
+libraries, linker flags, runtime dependencies, services and complex licensing.
+DEPENDS alone does not link libraries. The data template installs one file as
 `/usr/share/<package>/message.txt`.
+
+## Build-system templates (Scarthgap)
+
+All three local project templates include `main.c` and name the executable after
+the package. Their recipes fetch `file://project/` and set
+`S = "${WORKDIR}/project"`; source/build files live under the recipe's
+`files/project/` directory. Use the website preview to copy the full recipe and
+build files, or download the tar to keep paths intact.
+
+| Choice | Bundled build files | Recipe tasks and installation |
+| --- | --- | --- |
+| Make | `Makefile` | `B = "${S}"`, no configure task; explicit `oe_runmake` compilation and `oe_runmake 'DESTDIR=${D}' install` |
+| Autotools | `configure.ac`, `Makefile.am` | `inherit autotools`; class regenerates/configures, builds and installs with DESTDIR |
+| CMake | `CMakeLists.txt` | `inherit cmake`; class generates cross-toolchain settings, configures, builds and stages install |
+
+The Makefile honors CC/CPPFLAGS/CFLAGS/LDFLAGS, prefix, bindir and DESTDIR. Recipe
+EXTRA_OEMAKE passes Yocto's target variables; do not hardcode host gcc. Autotools
+and CMake classes supply native build tools, target compiler/sysroot configuration
+and separate `${B}` directories. Do not override their do_configure/do_compile/
+do_install tasks unnecessarily. Use EXTRA_OECONF or EXTRA_OECMAKE for actual
+upstream options. GNUInstallDirs in CMake and bin_PROGRAMS in Automake ensure the
+executable has an install rule.
+
+DESTDIR is a temporary packaging root, not the final prefix. Installing into
+`${D}/usr/bin` produces `/usr/bin` on the target, without changing the host's
+`/usr`. `DEPENDS += "zlib"` supplies build headers/libraries; the build files still
+need the appropriate library linkage. Additional runtime packages belong in
+`RDEPENDS:${PN}`; shared-library dependencies are often auto-detected.
+
+Git project modes consume the whole checkout at `${WORKDIR}/git`; the per-file
+source field is disabled and unused. The upstream repository must contain its own
+matching build/install files. Adapt S for nested layouts and verify executable
+names, install paths and package FILES before using the generated target command.
+The tool never invents missing upstream files or downloads/runs upstream code.
+The pinned [Autotools class](https://github.com/yoctoproject/poky/blob/529843b1c189ab7b133b7fdf197d4b2a4b71a6db/meta/classes-recipe/autotools.bbclass)
+and [CMake class](https://github.com/yoctoproject/poky/blob/529843b1c189ab7b133b7fdf197d4b2a4b71a6db/meta/classes-recipe/cmake.bbclass)
+are the source of truth for task behavior. These are source scaffolds, not
+claimed tested BitBake recipes or images.
 
 The generator deliberately accepts a narrow syntax: lowercase hyphenated package
 names, numeric versions, safe relative paths, plain single-line metadata, and

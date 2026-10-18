@@ -63,6 +63,17 @@ for (const board of Object.keys(BOARDS)) {
   }
 }
 
+test("local Make/CMake executable names cannot collide with build targets", () => {
+  for (const template of ["make", "cmake"]) {
+    for (const name of ["all", "clean", "install", "help", "test", "package"]) {
+      const result = generate({ template, name });
+      assert.ok(result.errors.name);
+      assert.deepEqual(result.files, []);
+    }
+  }
+  assert.deepEqual(generate({ template: "c", name: "all" }).errors, {});
+});
+
 test("CLOSED requires no license checksum and does not pretend to relicense Git sources", () => {
   for (const source of ["local", "git"]) {
     const result = generate({ ...(source === "git" ? git : {}), license: "CLOSED", licenseFile: "", licenseMd5: "" });
@@ -71,6 +82,49 @@ test("CLOSED requires no license checksum and does not pretend to relicense Git 
     assert.doesNotMatch(recipe(result), /LIC_FILES_CHKSUM/);
   }
 });
+
+for (const board of Object.keys(BOARDS)) {
+  for (const template of ["make", "autotools", "cmake"]) {
+    for (const source of ["local", "git"]) {
+      test(`${board} / ${template} / ${source}: build system owns the right tasks and ships complete inputs`, () => {
+        const result = generate({ ...(source === "git" ? git : {}), board, template, name: "my-custom-app", depends: "zlib" });
+        assert.deepEqual(result.errors, {});
+        const bb = result.files[0].content;
+        assert.match(bb, /DEPENDS \+= "zlib"/);
+        assert.ok(result.files.find(file => file.path === "local.conf.snippet").content.includes(`MACHINE = "${board}"`));
+        if (template === "make") {
+          assert.match(bb, /B = "\$\{S\}"/);
+          assert.match(bb, /do_configure\[noexec\] = "1"/);
+          assert.match(bb, /do_compile\(\) \{\n    oe_runmake/);
+          assert.match(bb, /oe_runmake 'DESTDIR=\$\{D\}' install/);
+          for (const flag of ["CC", "CFLAGS", "CPPFLAGS", "LDFLAGS", "prefix", "bindir"]) assert.ok(bb.includes(`'${flag}=\${${flag}}'`));
+        } else {
+          assert.ok(bb.includes(`inherit ${template}`));
+          assert.doesNotMatch(bb, /do_(configure|compile|install)(?:\(\)|\[noexec\])/);
+          assert.doesNotMatch(bb, /^B =/m);
+        }
+        if (source === "local") {
+          assert.match(bb, /SRC_URI = "file:\/\/project\/"/);
+          assert.match(bb, /S = "\$\{WORKDIR\}\/project"/);
+          const inputs = result.files.filter(file => file.path.includes("/files/project/"));
+          const expected = ["main.c", ...(template === "make" ? ["Makefile"] : template === "autotools" ? ["configure.ac", "Makefile.am"] : ["CMakeLists.txt"])];
+          assert.deepEqual(inputs.map(file => file.path.split("/").at(-1)).sort(), expected.sort());
+          assert.match(inputs.find(file => file.path.endsWith("main.c")).content, /#include <stdio.h>/);
+          const build = inputs.find(file => !file.path.endsWith("main.c")).content;
+          assert.ok(build.includes("my-custom-app"));
+          if (template === "make") assert.match(build, /\n\tinstall -m 0755.*\$\(DESTDIR\)\$\(bindir\)/);
+          if (template === "autotools") assert.ok(inputs.find(file => file.path.endsWith("Makefile.am")).content.includes("my_custom_app_SOURCES = main.c"));
+          if (template === "cmake") assert.match(build, /install\(TARGETS my-custom-app RUNTIME DESTINATION \$\{CMAKE_INSTALL_BINDIR\}\)/);
+        } else {
+          assert.match(bb, /S = "\$\{WORKDIR\}\/git"/);
+          assert.ok(bb.includes(`SRCREV = "${git.revision}"`));
+          assert.equal(result.files.filter(file => file.path.includes("/files/")).length, 0);
+        }
+        assert.deepEqual(unpackTar(archive(result.files)), result.files);
+      });
+    }
+  }
+}
 
 test("dependencies are normalized; image includes the custom package name", () => {
   const result = generate({ name: "my-sensor", depends: "  zlib   openssl virtual/libgl  ", version: "2.1.0" });

@@ -1,4 +1,4 @@
-import { archive, BOARDS, DEFAULTS, generate } from "./generator.js";
+import { archive, BOARDS, DEFAULTS, generate, PROJECT_TEMPLATES } from "./generator.js";
 import { guideSteps } from "./guide.js";
 
 const $ = id => document.getElementById(id);
@@ -45,6 +45,9 @@ function previewFile() {
 function syncFields() {
   const git = $("source").value === "git";
   $("git-fields").hidden = !git;
+  const project = PROJECT_TEMPLATES.includes(form.elements.template.value);
+  $("source-file-field").hidden = project;
+  $("sourceFile").disabled = project;
   for (const option of document.querySelectorAll("[data-git-only]")) option.disabled = !git;
   if (!git && !["MIT", "CLOSED"].includes($("license").value)) $("license").value = "MIT";
   $("license-fields").hidden = !git || $("license").value === "CLOSED";
@@ -160,7 +163,7 @@ function updateProgress() {
 form.addEventListener("input", () => update());
 form.addEventListener("change", event => {
   if (event.target.name === "template") {
-    $("sourceFile").value = { c: "main.c", cpp: "main.cpp", data: "message.txt" }[event.target.value];
+    $("sourceFile").value = { c: "main.c", cpp: "main.cpp", data: "message.txt" }[event.target.value] || "main.c";
   }
   update();
 });
