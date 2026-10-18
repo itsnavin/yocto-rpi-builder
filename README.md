@@ -3,8 +3,8 @@
 A beginner-friendly, browser-only Yocto recipe workbench and an end-to-end guide
 to preparing a custom **64-bit Raspberry Pi 4 or Pi 5** Linux image.
 
-**Publication target:** <https://itsnavin.github.io/yocto-rpi-builder/>.
-This is the intended GitHub Pages address, not proof of a completed deployment.
+**Live application:** <https://itsnavin.github.io/yocto-rpi-builder/>.
+Published through GitHub Pages with desktop/mobile live smoke checks.
 
 ## What it does
 
@@ -85,7 +85,9 @@ path. Inspect the pinned metadata rather than copying its generic README's
 `master` example.
 
 **Test status:** 78 Node unit tests and 14 desktop/mobile Chromium browser tests
-passed locally on Node 22.23.3; the static production build succeeded.
+passed locally on Node 22.23.3 and in GitHub Actions on Linux; the static production
+build and Pages deployment succeeded. Live desktop/mobile smoke checks verified
+asset loading, board-specific config/guide, tar downloads, layout and browser errors.
 The source/release/machine definitions are documentation-checked only:
 no successful full Yocto build or physical Pi boot is claimed. Application tests
 do not establish board support. A pinned release is reproducible input
@@ -127,7 +129,8 @@ path or runs flashing commands.
 
 ## Publishing to GitHub Pages
 
-`.github/workflows/pages.yml` tests and builds on pull requests, and deploys on
+`.github/workflows/pages.yml` uses an explicit Ubuntu 24.04 CI runner and current
+versioned Actions. It tests and builds on pull requests, and deploys on
 pushes to `main` or manual runs on `main`. In repository **Settings > Pages**,
 choose **GitHub Actions** as the source. The workflow uploads `dist/` and deploys
 through the `github-pages` environment. No secrets or third-party hosting account
