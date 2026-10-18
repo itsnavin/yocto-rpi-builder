@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Learn Yocto one small step at a time. Prepare a starter recipe and build a custom 64-bit Raspberry Pi 4 or Pi 5 Linux image.">
+  <meta name="theme-color" content="#102a2b">
+  <title>Pi Foundry | Yocto recipe workbench</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./src/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to workbench</a>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Pi Foundry home"><span class="brand-mark" aria-hidden="true">pf</span> Pi Foundry <span class="brand-note">a Yocto learning lab</span></a>
+    <a class="repo-link" href="https://github.com/itsnavin/yocto-rpi-builder">Source &amp; feedback <span aria-hidden="true">&#8599;</span></a>
+  </header>
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div>
+        <p class="eyebrow"><span class="dot"></span> SMALL BOARD. YOUR LINUX.</p>
+        <h1 id="hero-title">From an idea<br>to your first <em>image.</em></h1>
+        <p class="hero-description">Prepare a Yocto recipe. Understand what it does. Then follow the path to a Linux image made for your Raspberry Pi.</p>
+        <div class="hero-tags"><span>100% in your browser</span><span>No account or hardware needed to learn</span></div>
+      </div>
+      <aside class="target-card" aria-label="Target platform">
+        <div class="target-heading"><span class="chip-icon" aria-hidden="true">&#9638;</span><span>YOUR BUILD TARGET</span><span class="badge">64-bit</span></div>
+        <label for="board">Raspberry Pi board</label>
+        <select id="board" name="board" form="recipe-form">
+          <option value="raspberrypi4-64">Raspberry Pi 4 / 64-bit</option>
+          <option value="raspberrypi5">Raspberry Pi 5 / 64-bit</option>
+        </select>
+        <p class="machine-line">MACHINE <code id="machine-label">raspberrypi4-64</code></p>
+        <div class="target-divider"></div>
+        <p><strong>Scarthgap 5.0.13</strong><br><span class="muted">Pinned Poky + Scarthgap BSP revision</span></p>
+        <p class="small muted">Documentation-checked, not hardware-tested. This is a learning scaffold, not a certified image.</p>
+      </aside>
+    </section>
+
+    <nav class="workspace-nav" aria-label="Learning workspace">
+      <div role="tablist" aria-label="Workspace sections">
+        <button id="tab-builder" role="tab" aria-selected="true" aria-controls="panel-builder" tabindex="0"><span>01</span> Recipe workbench</button>
+        <button id="tab-guide" role="tab" aria-selected="false" aria-controls="panel-guide" tabindex="-1"><span>02</span> Build your image</button>
+        <button id="tab-basics" role="tab" aria-selected="false" aria-controls="panel-basics" tabindex="-1"><span>03</span> The basics</button>
+      </div>
+      <span class="offline-note">No code runs here</span>
+    </nav>
+
+    <noscript><p class="notice warning">Enable JavaScript to generate recipes and view the interactive guide. You can still read the README and upstream documentation through the repository link.</p></noscript>
+
+    <section id="panel-builder" role="tabpanel" aria-labelledby="tab-builder">
+      <div class="section-intro"><div><p class="eyebrow">MAKE SOMETHING SMALL</p><h2>Your first package starts here.</h2></div><p>Choose a template, give it a name,<br>and inspect every generated file.</p></div>
+      <div class="workbench">
+        <form id="recipe-form" class="form-card" novalidate>
+          <div class="card-heading"><span class="step-number">1</span><h3>Describe your package</h3><button type="button" id="reset-example" class="text-button">Reset example</button></div>
+          <fieldset>
+            <legend>What are you packaging?</legend>
+            <div class="template-options">
+              <label><input type="radio" name="template" value="c" checked><span><strong>C app</strong><small>One .c file</small></span></label>
+              <label><input type="radio" name="template" value="cpp"><span><strong>C++ app</strong><small>One .cpp file</small></span></label>
+              <label><input type="radio" name="template" value="data"><span><strong>Data file</strong><small>No compilation</small></span></label>
+            </div>
+          </fieldset>
+          <div class="two-columns">
+            <div class="field"><label for="name">Package name</label><input id="name" name="name" value="hello-pi" maxlength="60" required aria-describedby="name-help name-error"><small id="name-help">Lowercase, e.g. hello-pi. Becomes the executable name.</small><small class="field-error" id="name-error"></small></div>
+            <div class="field"><label for="version">Version</label><input id="version" name="version" value="1.0" maxlength="30" required aria-describedby="version-error"><small class="field-error" id="version-error"></small></div>
+          </div>
+          <div class="field"><label for="summary">Summary</label><input id="summary" name="summary" value="A small hello from my Raspberry Pi" maxlength="120" required aria-describedby="summary-error"><small class="field-error" id="summary-error"></small></div>
+          <div class="field"><label for="description">Description</label><textarea id="description" name="description" rows="2" maxlength="500" required aria-describedby="description-error">My first custom package for a Yocto Linux image.</textarea><small class="field-error" id="description-error"></small></div>
+          <div class="field"><label for="source">Where does the source live?</label><select id="source" name="source"><option value="local">Local files - include a working example</option><option value="git">Public Git repository - use my source</option></select></div>
+          <div id="git-fields" hidden>
+            <p class="notice">Only a single standalone source file is compiled. Projects with Make, CMake, Meson, extra headers or libraries need an adapted recipe. Data mode installs one file.</p>
+            <div class="field"><label for="gitUrl">HTTPS Git URL</label><input id="gitUrl" name="gitUrl" type="url" placeholder="https://github.com/owner/project.git" aria-describedby="git-help gitUrl-error"><small id="git-help">Never paste credentials. Nothing is fetched here. Building later trusts upstream code; review it and its license first.</small><small class="field-error" id="gitUrl-error"></small></div>
+            <div class="field"><label for="branch">Git branch</label><input id="branch" name="branch" value="main" aria-describedby="branch-error"><small class="field-error" id="branch-error"></small></div>
+            <div class="field"><label for="revision">Pinned commit SHA</label><input id="revision" name="revision" placeholder="40 hexadecimal characters" spellcheck="false" aria-describedby="revision-help revision-error"><small id="revision-help">Use git rev-parse HEAD on a reviewed checkout. The commit must belong to the selected branch.</small><small class="field-error" id="revision-error"></small></div>
+            <div class="field"><label for="sourceFile">Source path inside the repository</label><input id="sourceFile" name="sourceFile" value="main.c" aria-describedby="sourceFile-help sourceFile-error"><small id="sourceFile-help">Relative to the checkout, e.g. src/main.c. Data files are installed as message.txt.</small><small class="field-error" id="sourceFile-error"></small></div>
+          </div>
+          <div class="field"><label for="license">License</label><select id="license" name="license" aria-describedby="license-help license-error"><option value="MIT">MIT</option><option value="CLOSED">CLOSED (authorized proprietary source only)</option><option value="BSD-3-Clause" data-git-only>BSD-3-Clause</option><option value="Apache-2.0" data-git-only>Apache-2.0</option><option value="GPL-2.0-only" data-git-only>GPL-2.0-only</option><option value="GPL-3.0-only" data-git-only>GPL-3.0-only</option></select><small id="license-help">Local examples are MIT and reference Poky's real common-license checksum. CLOSED skips the license checksum; it is not a way to bypass another project's license.</small><small class="field-error" id="license-error"></small></div>
+          <div id="license-fields" hidden>
+            <div class="field"><label for="licenseFile">License file path</label><input id="licenseFile" name="licenseFile" value="LICENSE" aria-describedby="licenseFile-error"><small class="field-error" id="licenseFile-error"></small></div>
+            <div class="field"><label for="licenseMd5">License MD5 checksum</label><input id="licenseMd5" name="licenseMd5" placeholder="Run md5sum LICENSE on the pinned source" spellcheck="false" aria-describedby="checksum-help licenseMd5-error"><small id="checksum-help">No checksum is invented. This detects license changes, not source authenticity. A license expression or multiple license files need manual editing.</small><small class="field-error" id="licenseMd5-error"></small></div>
+          </div>
+          <div class="field"><label for="depends">Build dependencies <span class="optional">optional</span></label><input id="depends" name="depends" placeholder="e.g. zlib openssl" aria-describedby="depends-help depends-error"><small id="depends-help">DEPENDS uses recipe names and prepares headers/libraries. It does not add linker flags or runtime services. Adapt compilation if needed.</small><small class="field-error" id="depends-error"></small></div>
+          <p id="validation-status" role="status" class="validation-status"></p>
+          <button class="primary-button" type="submit">Refresh starter files <span aria-hidden="true">&#8594;</span></button>
+        </form>
+        <div class="output-column">
+          <section class="output-card" aria-labelledby="output-title">
+            <div class="card-heading"><span class="step-number">2</span><h3 id="output-title">Inspect your starter files</h3><span id="file-count" class="badge"></span></div>
+            <label class="file-picker-label" for="file-picker">Preview file</label>
+            <select id="file-picker" aria-describedby="path-note"></select>
+            <p class="small" id="path-note">The archive preserves these paths. Individual downloads contain one file only.</p>
+            <div class="code-toolbar"><span id="file-type">BITBAKE RECIPE</span><button id="copy-file" type="button">Copy</button><button id="download-file" type="button">Download file</button></div>
+            <pre class="recipe-preview" tabindex="0" aria-label="Generated file content"><code id="preview"></code></pre>
+            <div class="download-bar"><div><strong>A layer, not just a snippet.</strong><small>Recipe + source + config + image + commands</small></div><button id="download-all" type="button" class="primary-button">Download .tar</button></div>
+          </section>
+          <aside class="notice warning"><strong>A starting point, not a build guarantee.</strong> Verify source paths, license terms/checksums and dependency/linker flags. Extract into <code>~/yocto-rpi</code>, inspect the files, then follow the image guide. Generated commands are never executed by this site.</aside>
+          <details class="explanation"><summary>What am I looking at?</summary><p><code>S</code> is the source directory; <code>B</code> is the build directory. <code>do_compile</code> uses Yocto's cross-compiler, not your laptop's gcc. <code>do_install</code> stages files under <code>${D}</code>, not on your host filesystem.</p><p>For this pinned Scarthgap release, local <code>file://</code> sources unpack into <code>${WORKDIR}</code>; Git sources into <code>${WORKDIR}/git</code>. Newer releases changed unpacking conventions. Do not blindly copy this into Styhead or later.</p><p><code>IMAGE_INSTALL:append = " hello-pi"</code> adds a package to an image. The initial space matters. Downloaded files are examples licensed under this repository's MIT license unless you explicitly select CLOSED and replace them with authorized proprietary code.</p></details>
+          <button type="button" class="next-link" id="open-guide">Next: turn your package into an image <span aria-hidden="true">&#8594;</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-guide" role="tabpanel" aria-labelledby="tab-guide" hidden>
+      <div class="section-intro"><div><p class="eyebrow">THE WHOLE JOURNEY</p><h2>Build it. Flash it. Understand it.</h2></div><p>Linux Bash commands for <strong data-board-name>Raspberry Pi 4</strong>.<br>Take one step at a time.</p></div>
+      <div class="notice warning"><strong>Version contract:</strong> Poky 5.0.13 (Scarthgap) and the pinned Scarthgap meta-raspberrypi commit. Not a claim of latest release or hardware testing. No U-Boot, desktop, Wi-Fi setup or SSH server by default. Changing board updates the snippets below; use a separate build directory for each board.</div>
+      <div class="guide-layout"><aside class="guide-sidebar"><p class="eyebrow">YOUR ROADMAP</p><ol id="guide-nav"></ol><p id="progress-label" role="status">0 of 10 checkpoints completed</p><progress id="progress" max="10" value="0" aria-label="Learning checkpoints"></progress><small>Checkpoints last for this page visit only.</small></aside><div id="guide-steps"></div></div>
+      <section class="sources"><h3>Keep the authoritative docs close</h3><p>The source files at these exact revisions take precedence over generic “latest” tutorials.</p><ul>
+        <li><a href="https://docs.yoctoproject.org/5.0.13/brief-yoctoprojectqs/index.html">Yocto 5.0.13 Quick Build</a> and <a href="https://docs.yoctoproject.org/5.0.13/ref-manual/system-requirements.html">host requirements</a></li>
+        <li><a href="https://docs.yoctoproject.org/5.0.13/dev-manual/new-recipe.html">Writing a recipe</a> and <a href="https://docs.yoctoproject.org/5.0.13/dev-manual/customizing-images.html">customizing images</a></li>
+        <li><a href="https://github.com/yoctoproject/poky/tree/529843b1c189ab7b133b7fdf197d4b2a4b71a6db">Pinned Poky source</a> (tag yocto-5.0.13)</li>
+        <li><a href="https://github.com/agherzan/meta-raspberrypi/tree/018d44467c4f09eb63f8ea5e86e85d755250cf89">Pinned meta-raspberrypi source</a>: read <code>conf/layer.conf</code>, <code>conf/machine</code> and <code>docs</code></li>
+        <li><a href="https://meta-raspberrypi.readthedocs.io/en/latest/">BSP maintainer's guide</a> (latest; reconcile with the pinned source) and <a href="https://www.raspberrypi.com/documentation/computers/getting-started.html#installing-the-operating-system">Raspberry Pi flashing documentation</a></li>
+      </ul></section>
+    </section>
+
+    <section id="panel-basics" role="tabpanel" aria-labelledby="tab-basics" hidden>
+      <div class="section-intro"><div><p class="eyebrow">A FEW NEW WORDS</p><h2>Not magic. Just a build system.</h2></div><p>Yocto assembles your own Linux distribution.<br>It is not an operating system you install with apt.</p></div>
+      <div class="concept-flow" aria-label="Build flow"><span>Source code</span><b aria-hidden="true">&#8594;</b><span>Recipe</span><b aria-hidden="true">&#8594;</b><span>Package</span><b aria-hidden="true">&#8594;</b><span>Image</span><b aria-hidden="true">&#8594;</b><span>Your Pi</span></div>
+      <div class="concept-grid">
+        <article><span class="concept-index">01</span><h3>BitBake</h3><p>The task coordinator. It reads recipes, works out dependencies, fetches sources, compiles packages and assembles the image. <code>bitbake hello-pi</code> builds a package; <code>bitbake core-image-minimal</code> builds a whole filesystem image.</p></article>
+        <article><span class="concept-index">02</span><h3>Recipe (.bb)</h3><p>A set of build instructions: where the source is, its license, how to compile it and where files belong. A recipe is not usually your application source code; it describes how to turn that code into packages.</p></article>
+        <article><span class="concept-index">03</span><h3>Layer (meta-*)</h3><p>A folder of related recipes and settings. Poky supplies the base. <code>meta-raspberrypi</code> supplies board support. Your <code>meta-myboard</code> keeps personal changes separate. <code>bblayers.conf</code> tells BitBake which layers to read.</p></article>
+        <article><span class="concept-index">04</span><h3>Image</h3><p>The collection of packages you want on the board. An image recipe chooses the contents. A <code>.wic</code> file is a disk image with partitions, boot files and the root filesystem, ready to write to a card.</p></article>
+        <article><span class="concept-index">05</span><h3>MACHINE / BSP</h3><p>MACHINE chooses hardware settings, kernel and device trees from the board support package (BSP). Pi 4 uses <code>raspberrypi4-64</code>; Pi 5 uses <code>raspberrypi5</code> here. Similar-looking names are not interchangeable.</p></article>
+        <article><span class="concept-index">06</span><h3>Cross-compilation</h3><p>Your x86 Linux computer builds ARM64 software using a target compiler. Yocto supplies the toolchain. An ARM binary will not normally run on your laptop; test it on the target, or use an appropriate emulator separately.</p></article>
+      </div>
+      <form id="quiz" class="quiz-card">
+        <p class="eyebrow">QUICK CHECK</p><h3>You built hello-pi, but it is missing on the Pi. What next?</h3>
+        <label><input type="radio" name="answer" value="compiler">Install gcc on the Raspberry Pi.</label>
+        <label><input type="radio" name="answer" value="image">Add hello-pi to IMAGE_INSTALL, rebuild the image, then reflash it.</label>
+        <label><input type="radio" name="answer" value="machine">Rename MACHINE to hello-pi.</label>
+        <button type="submit" class="primary-button">Check my understanding</button><p id="quiz-result" role="status"></p>
+      </form>
+    </section>
+    <p id="action-status" class="action-status" role="status" aria-live="polite"></p>
+  </main>
+  <footer><span><strong>Pi Foundry</strong> / Learn by building, not by guessing.</span><span>Independent project. Not affiliated with Raspberry Pi or the Yocto Project.</span></footer>
+</body>
+</html>
