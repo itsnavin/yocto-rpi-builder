@@ -59,6 +59,26 @@ test("invalid input disables stale downloads and gives a linked field error", as
   await expect(page.locator("#download-all")).toBeEnabled();
 });
 
+test("devshell instructions are copyable, recipe-specific and distinguish Make from class tasks", async ({ page }) => {
+  await page.locator("#name").fill("my-demo");
+  for (const template of ["make", "autotools", "cmake"]) {
+    await page.locator(`input[name="template"][value="${template}"]`).check();
+    await page.locator("#file-picker").selectOption({ label: "devshell-steps.txt" });
+    await expect(page.locator("#preview")).toContainText("bitbake my-demo -c devshell");
+    await expect(page.locator("#preview")).toContainText(`bitbake my-demo -C ${template === "make" ? "compile" : "configure"}`);
+    const pending = page.waitForEvent("download");
+    await page.locator("#download-file").click();
+    const doc = await pending;
+    expect(doc.suggestedFilename()).toBe("devshell-steps.txt");
+    expect(await readFile(await doc.path(), "utf8")).toContain("pseudo/fakeroot");
+  }
+  await page.getByRole("tab", { name: "The basics" }).click();
+  await expect(page.locator("#devshell-lessons article")).toHaveCount(3);
+  await expect(page.locator("#devshell-section")).toContainText("not an executed Yocto devshell test");
+  await expect(page.locator("#devshell-section")).toContainText("S/B/D/T");
+  await expect(page.getByRole("button", { name: "Copy cmake devshell prepare commands", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
+});
 test("Git scaffold requires a full revision and a license checksum", async ({ page }) => {
   await page.locator("#source").selectOption("git");
   await expect(page.locator("#git-fields")).toBeVisible();

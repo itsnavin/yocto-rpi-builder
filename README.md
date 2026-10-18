@@ -13,6 +13,8 @@ Published through GitHub Pages with desktop/mobile live smoke checks.
 - Also generates **Make**, **Autotools**, and **CMake** project recipes with complete
   local C examples or an existing Git project. The basics tab explains source layout,
   cross-compilation, task ownership, staging/install paths, and dependencies.
+- Includes step-by-step **devshell** debugging for Make, Autotools and CMake in
+  The basics tab; each generated project archive contains `devshell-steps.txt`.
 - Includes SUMMARY, DESCRIPTION, LICENSE, license checksums where required,
   SRC_URI/SRCREV, release-appropriate source/build paths, DEPENDS,
   do_compile/do_install, and IMAGE_INSTALL.
@@ -92,8 +94,8 @@ enable U-Boot. It does not require extra meta-openembedded layers for the minima
 path. Inspect the pinned metadata rather than copying its generic README's
 `master` example.
 
-**Test coverage:** 91 generator/static tests, three Linux-only native source-build
-smoke checks and 16 desktop/mobile Chromium browser checks. CI runs them before
+**Test coverage:** generator/static tests, three Linux-only native source-build
+smoke checks and 18 desktop/mobile Chromium browser checks. CI runs them before
 publishing. Native source tests do not validate Yocto recipe execution.
 The source/release/machine definitions are documentation-checked only:
 no successful full Yocto build or physical Pi boot is claimed. Application tests
@@ -160,6 +162,38 @@ The pinned [Autotools class](https://github.com/yoctoproject/poky/blob/529843b1c
 and [CMake class](https://github.com/yoctoproject/poky/blob/529843b1c189ab7b133b7fdf197d4b2a4b71a6db/meta/classes-recipe/cmake.bbclass)
 are the source of truth for task behavior. These are source scaffolds, not
 claimed tested BitBake recipes or images.
+
+## Devshell compilation (Scarthgap)
+
+The **The basics > Compile inside a Yocto devshell** section has separate,
+copyable Make, Autoconf/Automake and CMake workflows. Project downloads contain
+the same steps in `devshell-steps.txt`, with the selected recipe name.
+
+1. In the original Linux terminal, initialize the existing build directory and
+   prepare the recipe. Force configure (Autotools/CMake), then compile and install
+   through BitBake; stop at failures. Plain Make has no configure script.
+2. Inspect expanded `S`, `B`, `D`, `T`, compiler/flags and sysroot with
+   `bitbake -e <recipe>`; record the actual absolute T path. Enter with
+   `bitbake <recipe> -c devshell`. The shell normally starts in S, not B.
+3. In devshell, inspect the current `run.do_*` scripts in that recorded T directory.
+   Execute the configure/compile scripts in order to reuse the exact BitBake
+   environment/flags. Do not assume metadata such as B/T is exported to the shell,
+   source a task script, invoke host gcc or guess out-of-tree configure commands.
+4. Inspect run.do_install, but run installation via BitBake outside devshell to
+   preserve pseudo/fakeroot ownership tracking. D is staging, not host/target
+   installation. Never use sudo make install.
+5. Persist experimental changes in the layer, a source patch or an upstream Git
+   commit/SRCREV update. Exit devshell, use `bitbake <recipe> -C configure` for
+   Autotools/CMake or `-C compile` for Make, then rebuild the selected image.
+   Script replay alone does not update task stamps or package/image outputs.
+
+The lesson explains OE_TERMINAL/interactive host requirements, missing task scripts
+due to stamps/sstate, Make's noexec configure task, native tool/sysroot failures
+and the difference between in-source Make and class-managed separate build
+directories. See the [release-specific devshell documentation](https://docs.yoctoproject.org/5.0.13/dev-manual/development-shell.html)
+and [pinned implementation](https://github.com/yoctoproject/poky/blob/529843b1c189ab7b133b7fdf197d4b2a4b71a6db/meta/classes-global/devshell.bbclass).
+**No actual BitBake devshell execution or ARM cross-compilation was validated.**
+Generator/browser tests and Linux native source smoke tests do not establish that.
 
 The generator deliberately accepts a narrow syntax: lowercase hyphenated package
 names, numeric versions, safe relative paths, plain single-line metadata, and

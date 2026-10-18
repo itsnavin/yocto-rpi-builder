@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { archive, BOARDS, DEFAULTS, generate, localConfig, RELEASE, setupCommands, validate } from "../src/generator.js";
 import { guideSteps } from "../src/guide.js";
+import { devshellDocument, devshellLesson } from "../src/devshell.js";
 
 const git = {
   source: "git", gitUrl: "https://github.com/example/fixture.git", branch: "release/1.0",
@@ -121,10 +122,47 @@ for (const board of Object.keys(BOARDS)) {
           assert.equal(result.files.filter(file => file.path.includes("/files/")).length, 0);
         }
         assert.deepEqual(unpackTar(archive(result.files)), result.files);
+        const devshell = result.files.find(file => file.path === "devshell-steps.txt");
+        assert.ok(devshell.content.includes("bitbake my-custom-app -c devshell"));
+        assert.ok(devshell.content.includes(`bitbake my-custom-app -C ${template === "make" ? "compile" : "configure"}`));
       });
     }
   }
 }
+
+for (const template of ["make", "autotools", "cmake"]) {
+  test(`${template}: devshell steps prepare tasks, replay safely and rebuild persistently`, () => {
+    const lesson = devshellLesson(template, "my-demo");
+    assert.ok(lesson.prepare.includes("source poky/oe-init-build-env build"));
+    assert.ok(lesson.prepare.indexOf("bitbake my-demo -c compile -f") < lesson.prepare.indexOf("bitbake my-demo -c install -f"));
+    assert.ok(lesson.prepare.indexOf("bitbake my-demo -c install -f") < lesson.prepare.indexOf("bitbake my-demo -c devshell"));
+    assert.match(lesson.prepare, /grep -E '\^\(S\|B\|D\|T\|WORKDIR\|CC/);
+    assert.match(lesson.replay, /read -r -p "Absolute T path/);
+    assert.match(lesson.replay, /sed -n '1,100p' "\$taskdir\/run.do_install"/);
+    assert.doesNotMatch(lesson.replay, /^"\$taskdir\/run.do_install"/m);
+    assert.doesNotMatch(lesson.replay, /cd ["']?\$\{?[SBDT]\}?|source .*run.do_|sudo /);
+    if (template === "make") {
+      assert.doesNotMatch(lesson.prepare, /-c configure -f/);
+      assert.doesNotMatch(lesson.replay, /"\$taskdir\/run.do_configure"/);
+      assert.match(lesson.detail, /B equals S/);
+    } else {
+      assert.ok(lesson.prepare.indexOf("-c configure -f") < lesson.prepare.indexOf("-c compile -f"));
+      assert.match(lesson.replay, /"\$taskdir\/run.do_configure" && "\$taskdir\/run.do_compile"/);
+    }
+    assert.ok(lesson.finish.includes("bitbake core-image-minimal"));
+    const doc = devshellDocument(template, "my-demo");
+    for (const text of ["pseudo/fakeroot", "OE_TERMINAL", "stamps", "sstate", "SRCREV", "not an executed BitBake devshell test"])
+      assert.ok(doc.includes(text), text);
+    assert.match(doc, /https:\/\/docs.yoctoproject.org\/5.0.13\/dev-manual\/development-shell.html/);
+  });
+}
+
+test("devshell docs do not alter single-file downloads or accept injected recipe names", () => {
+  for (const template of ["c", "cpp", "data"]) assert.equal(generate({ template }).files.some(file => file.path === "devshell-steps.txt"), false);
+  assert.throws(() => devshellLesson("shell"), /Unsupported/);
+  assert.throws(() => devshellLesson("__proto__"), /Unsupported/);
+  assert.throws(() => devshellLesson("make", "x;id"), /Unsafe/);
+});
 
 test("dependencies are normalized; image includes the custom package name", () => {
   const result = generate({ name: "my-sensor", depends: "  zlib   openssl virtual/libgl  ", version: "2.1.0" });

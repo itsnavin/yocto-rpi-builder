@@ -1,3 +1,5 @@
+import { devshellDocument } from "./devshell.js";
+
 export const RELEASE = Object.freeze({
   name: "Scarthgap 5.0.13",
   branch: "scarthgap",
@@ -232,6 +234,7 @@ ${data ? `cat /usr/share/${x.name}/message.txt` : `/usr/bin/${x.name}`}
 ` },
     { path: "meta-myboard/COPYING", content: scaffoldLicense },
   ];
+  if (project) files.push({ path: "devshell-steps.txt", content: devshellDocument(x.template, x.name) });
   if (local) {
     const header = x.license === "MIT" ? "// SPDX-License-Identifier: MIT\n" : "// Proprietary example: replace with authorized source.\n";
     const content = data ? "Hello from a custom Yocto data package!\n"

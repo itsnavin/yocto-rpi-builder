@@ -1,5 +1,6 @@
 import { archive, BOARDS, DEFAULTS, generate, PROJECT_TEMPLATES } from "./generator.js";
 import { guideSteps } from "./guide.js";
+import { devshellLesson } from "./devshell.js";
 
 const $ = id => document.getElementById(id);
 const form = $("recipe-form");
@@ -160,6 +161,31 @@ function updateProgress() {
   $("progress-label").textContent = `${count} of 10 checkpoints completed`;
 }
 
+function renderDevshellLessons() {
+  for (const template of PROJECT_TEMPLATES) {
+    const lesson = devshellLesson(template);
+    const article = document.createElement("article");
+    article.className = "guide-step";
+    const title = document.createElement("h3"); title.textContent = lesson.title;
+    const detail = document.createElement("p"); detail.textContent = lesson.detail;
+    article.append(title, detail);
+    for (const [key, heading] of [["prepare", "1. Original terminal: prepare"], ["replay", "2. New devshell: inspect and replay"], ["finish", "3. Original terminal: persist and rebuild"]]) {
+      const subtitle = document.createElement("h4"); subtitle.textContent = heading;
+      const block = document.createElement("div"); block.className = "guide-code";
+      const toolbar = document.createElement("div"); toolbar.className = "code-toolbar";
+      const caption = document.createElement("span"); caption.textContent = "LINUX BASH";
+      const button = document.createElement("button"); button.type = "button"; button.textContent = "Copy";
+      button.setAttribute("aria-label", `Copy ${template} devshell ${key} commands`);
+      button.addEventListener("click", () => copy(lesson[key]));
+      toolbar.append(caption, button);
+      const pre = document.createElement("pre"); pre.tabIndex = 0;
+      const code = document.createElement("code"); highlight(code, lesson[key]);
+      pre.append(code); block.append(toolbar, pre); article.append(subtitle, block);
+    }
+    $("devshell-lessons").append(article);
+  }
+}
+
 form.addEventListener("input", () => update());
 form.addEventListener("change", event => {
   if (event.target.name === "template") {
@@ -219,4 +245,4 @@ function route() {
   } else showPanel(["builder", "guide", "basics"].includes(hash) ? hash : "builder");
 }
 window.addEventListener("hashchange", route);
-update(); renderGuide(); route();
+update(); renderGuide(); renderDevshellLessons(); route();
