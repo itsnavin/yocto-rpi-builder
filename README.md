@@ -81,12 +81,18 @@ specific Scarthgap LTS snapshot, not whatever the latest release happens to be:
 | Component | Pin |
 | --- | --- |
 | Poky / Yocto | **5.0.13**, tag `yocto-5.0.13`, Scarthgap series |
-| Poky commit | `529843b1c189ab7b133b7fdf197d4b2a4b71a6db` |
+| Poky annotated tag object | `529843b1c189ab7b133b7fdf197d4b2a4b71a6db` |
+| Poky resolved commit | `f16cffd030d21d12dd57bb95cfc310bda41f8a1f` |
 | meta-raspberrypi | Scarthgap commit `018d44467c4f09eb63f8ea5e86e85d755250cf89` |
 | Pi 4 64-bit MACHINE | `raspberrypi4-64` |
 | Pi 5 64-bit MACHINE | `raspberrypi5` |
 | Boot | Direct Raspberry Pi firmware; `RPI_USE_U_BOOT = "0"` |
 | Guide host | Ubuntu 22.04 LTS x86-64, Linux filesystem, Bash |
+
+The checkout commands retain the annotated tag object's SHA: Git resolves it to
+the commit above when checking out the source. This distinction was verified
+against the GitHub tag API on **2026-10-20**; the release and checkout behavior
+are unchanged.
 
 The pinned BSP's `conf/layer.conf` declares Scarthgap compatibility and a required
 `core` dependency. It recommends an additional U-Boot mixin; this guide does not
